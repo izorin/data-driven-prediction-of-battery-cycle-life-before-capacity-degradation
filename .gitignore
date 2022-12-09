@@ -7,3 +7,8 @@ Data/
 #ignore jupyter notebook files
 .ipynb_checkpoints/
 __pycache__/
+pics/*
+latex_images/*
+.DS_Store
+
+
