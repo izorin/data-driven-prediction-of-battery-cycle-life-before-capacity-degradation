@@ -214,7 +214,11 @@ class BattData(Dataset):
 
     def get_indices_by_batt(self, batt_list=[]):
         # returns data indices of batteries in `batt_list`
-        pass
+        idxs = []
+        for batt in batt_list: 
+            idxs += self.batt_to_idxs[batt]
+
+        return idxs
 
 
     def train_test_split(self, batts=[]):
@@ -227,8 +231,13 @@ class BattData(Dataset):
 
 class BattDataloader():
     def __init__(self, dataset, load_features=[], batch_size=1, shuffle=False, sampler=None, batch_sampler=None, num_workers=0, collate_fn=None, pin_memory=False, drop_last=False, timeout=0, worker_init_fn=None, generator=None, prefetch_factor=2, persistent_workers=False):
+        
+        
+        if type(dataset) == torch.utils.data.dataset.Subset:
+            self.dataset = dataset.dataset
+        else:
+            self.dataset = dataset
 
-        self.dataset = dataset
         self.load_features = load_features if len(load_features) > 0 else self.dataset.feature_names
 
         collate_fn = partial(self._collate_fn, **{}) 
@@ -250,9 +259,9 @@ class BattDataloader():
         cycles = [sample[1] for sample in batch]
         max_lengths = [sample[2] for sample in batch]
         features = [sample[3] for sample in batch]
-        ruls = [dataset.batt_life_cycles[batt_name] - cycle for batt_name, cycle in zip(batt_names, cycles)]
-        his_approx = [dataset.batt_fade_approx[batt_name]['QD'](cycle).item() for batt_name, cycle in zip(batt_names, cycles)]
-        reference_his = dataset.get_reference_hi(cycles)
+        ruls = [self.dataset.batt_life_cycles[batt_name] - cycle for batt_name, cycle in zip(batt_names, cycles)]
+        his_approx = [self.dataset.batt_fade_approx[batt_name]['QD'](cycle).item() for batt_name, cycle in zip(batt_names, cycles)]
+        reference_his = self.dataset.get_reference_hi(cycles)
 
         ruls = torch.tensor(ruls)
         his_approx = torch.tensor(his_approx)
@@ -288,7 +297,17 @@ if __name__ == '__main__':
     # dataset init
     dataset = BattData(data_path, 'batt_data.pkl', hi_approximator=hi_approximator, hi_approximator_kwargs=hi_approximator_kwargs,  is_save_data=False)
 
+    # example of train-test split 
+    batteries = dataset.batt_names
+    train_batts = [batt for batt in batteries if 'b1c' in batt]
+    test_batts = [batt for batt in batteries if 'b2c' in batt]
 
+    train_idxs = dataset.get_indices_by_batt(train_batts)
+    test_idxs = dataset.get_indices_by_batt(test_batts)
+
+    train_dataset = torch.utils.data.Subset(dataset, train_idxs)
+    test_dataset = torch.utils.data.Subset(dataset, test_idxs)
+    # ==========
 
     
     # dataloader init
